@@ -1,0 +1,576 @@
+<?php
+/**
+ * Font Repository Browser for the Chronolabs Cooperative Fonting Repository Services API
+ *
+ * You may not change or alter any portion of this comment or credits
+ * of supporting developers from this source code or any supporting source code
+ * which is considered copyrighted (c) material of the original comment or credit authors.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * @copyright   	The XOOPS Project http://sourceforge.net/projects/xoops/
+ * @license     	General Public License version 3 (http://labs.coop/briefs/legal/general-public-licence/13,3.html)
+ * @author      	Simon Roberts (wishcraft) <wishcraft@users.sourceforge.net>
+ * @subpackage  	fontsvn+
+ * @description 	Font Repository Browser for the Chronolabs Cooperative Fonting Repository Services API
+ * @version			1.0.1
+ * @link        	https://sourceforge.net/projects/chronolabs/files/XOOPS%202.5/Modules/fontsvn
+ * @link        	https://sourceforge.net/projects/chronolabs/files/XOOPS%202.6/Modules/fontsvn
+ * @link			https://sourceforge.net/p/xoops/svn/HEAD/tree/XoopsModules/fontsvn
+ * @link			http://internetfounder.wordpress.com
+ */
+
+
+if (!defined('_MD_FONTSVN_MODULE_DIRNAME')) {
+	return false;
+}
+
+//*
+require_once (__DIR__ . DIRECTORY_SEPARATOR . 'objects.php');
+
+/**
+ * Class for Glyphs in Fonts2Web.org.uk Font Converter
+ *
+ * For Table:-
+ * <code>
+ * CREATE TABLE `fontsvn_identities` (
+ *   `id` mediumint(24) NOT NULL AUTO_INCREMENT,
+ *   `identity` varchar(45) DEFAULT '',
+ *   `base` varchar(1) DEFAULT '',
+ *   `second` varchar(2) DEFAULT '',
+ *   `thirds` varchar(3) DEFAULT '',
+ *   `downloads` int(13) DEFAULT '0',
+ *   `views` int(13) DEFAULT '0',
+ *   `glyphs` tinytext,
+ *   `name` varchar(255) DEFAULT '',
+ *   `tags` varchar(255) DEFAULT '',
+ *   `barcode` varchar(32) DEFAULT '',
+ *   `referee` varchar(128) DEFAULT '',
+ *   `filename` varchar(128) DEFAULT '',
+ *   `preview` varchar(255) DEFAULT '',
+ *   `naming` varchar(255) DEFAULT '',
+ *   `css` varchar(255) DEFAULT '',
+ *   `created` int(13) DEFAULT '0',
+ *   `verify` int(13) DEFAULT '0',
+ *   `last` int(13) DEFAULT '0',
+ *   `downloaded` int(13) DEFAULT '0',
+ *   `glyphed` int(13) DEFAULT '0',
+ *   `notified` int(13) DEFAULT '0',
+ *   `articleid` int(13) DEFAULT '0',
+ *   PRIMARY KEY (`id`)
+ * ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+ * </code>
+ * @author Simon Roberts (wishcraft@users.sourceforge.net)
+ * @copyright copyright (c) 2015 labs.coop
+ */
+class fontsvnIdentities extends fontsvnXoopsObject
+{
+
+	var $handler = '';
+	
+    function __construct($id = null)
+    {   	
+    	
+        self::initVar('id', XOBJ_DTYPE_INT, 0, false);
+        self::initVar('identity', XOBJ_DTYPE_TXTBOX, md5(null), false, 45);
+        self::initVar('base', XOBJ_DTYPE_TXTBOX, '', false, 1);
+        self::initVar('second', XOBJ_DTYPE_TXTBOX, '', false, 2);
+        self::initVar('thirds', XOBJ_DTYPE_TXTBOX, '', false, 3);
+        self::initVar('downloads', XOBJ_DTYPE_INT, 0, false);
+        self::initVar('views', XOBJ_DTYPE_INT, 0, false);
+        self::initVar('glyphs', XOBJ_DTYPE_ARRAY, array(), false);
+        self::initVar('name', XOBJ_DTYPE_TXTBOX, '', false, 255);
+        self::initVar('tags', XOBJ_DTYPE_TXTBOX, '', false, 255);
+        self::initVar('barcode', XOBJ_DTYPE_TXTBOX, '', false, 32);
+        self::initVar('referee', XOBJ_DTYPE_TXTBOX, '', false, 128);
+        self::initVar('filename', XOBJ_DTYPE_TXTBOX, '', false, 128);
+        self::initVar('preview', XOBJ_DTYPE_TXTBOX, '', false, 255);
+        self::initVar('naming', XOBJ_DTYPE_TXTBOX, '', false, 255);
+        self::initVar('css', XOBJ_DTYPE_TXTBOX, '', false, 255);
+        self::initVar('created', XOBJ_DTYPE_INT, 0, false);
+        self::initVar('verify', XOBJ_DTYPE_INT, 0, false);
+        self::initVar('verified', XOBJ_DTYPE_INT, 0, false);
+        self::initVar('files', XOBJ_DTYPE_INT, 0, false);
+        self::initVar('missing', XOBJ_DTYPE_INT, 0, false);
+        self::initVar('last', XOBJ_DTYPE_INT, 0, false);
+        self::initVar('downloaded', XOBJ_DTYPE_INT, 0, false);
+        self::initVar('glyphed', XOBJ_DTYPE_INT, 0, false);
+        self::initVar('notified', XOBJ_DTYPE_INT, 0, false);
+        self::initVar('articleid', XOBJ_DTYPE_INT, 0, false);
+        self::initVar('validation', XOBJ_DTYPE_ARRAY, array(), false);
+        
+        $this->handler = __CLASS__ . 'Handler';
+        if (!empty($id) && !is_null($id))
+        {
+        	$handler = new $this->handler;
+        	self::assignVars($handler->get($id)->getValues(array_keys($this->vars)));
+        }
+        
+    }
+
+    /**
+     * 
+     * @return boolean[]|string[]|mixed[]|NULL[]|array[]
+     */
+    function getAdminPanelArray()
+    {
+    	global $fontsvnConfigsList;
+    	return array(	'name' => $this->getVar('name'),
+    					'views' => $this->getVar('views'),
+    					'downloads' => $this->getVar('downloads'),
+    					'url' => $this->getFontURL('id'),
+    					'naming' => $this->getNamingURL($fontsvnConfigsList['images'])		);
+    }
+    
+    /**
+     * 
+     * @return string
+     */
+    function getDescriptionTile()
+    {
+    	global $fontsvnConfigsList;
+    	$GLOBALS['xoTheme']->addStylesheet(XOOPS_URL . "/modules/" . _MD_FONTSVN_MODULE_DIRNAME . '/language/' . $GLOBALS['xoopsConfig']['language'] . '/style.css');
+    	xoops_loadLanguage('main', _MD_FONTSVN_MODULE_DIRNAME);
+    	$html = "<div style=\"margin: 8px; padding: 3px; text-align: center;\">\n
+	<img  id=\"fontsvnfontnaming\" src=\"".$this->getNamingURL($fontsvnConfigsList['images']) ."\" title=\"" . $this->getVar('name') ."\" alt=\"" . $this->getVar('name') ."\" width='89%' />\n
+	<br />\n
+	<span id=\"fontsvnviewsdownloads\">"._MN_FONTSVN_FONT_VIEWS.":&nbsp;".$this->getVar('views')."&nbsp;/&nbsp;"._MN_FONTSVN_FONT_DOWNLOADS.":&nbsp;".$this->getVar('downloads')."</span>\n
+</div>\n
+<h1>"._MN_FONTSVN_FONT_PREVIEW_H1." ".$this->getVar('name')."</h1>\n
+<div style=\"margin: 8px; padding: 3px; text-align: center;\">\n
+	<img  id=\"fontsvnfontnaming\" src=\"".$this->getPreviewURL($fontsvnConfigsList['images'])."\" title=\"".$this->getVar('name')."\" alt=\"".$this->getVar('name')."\" width='97%' />\n
+	<br />\n
+</div>\n
+<h1>"._MN_FONTSVN_FONT_DOWNLOADING_H1." ".$this->getVar('name')."</h1>\n
+<div style=\"margin: 8px; padding: 3px; text-align: center;\">\n
+	<ol style=\"list-style: none !important; list-style-type: none !important;\">\n";
+    	foreach (getDownloadURLsArray(explode(",",$fontsvnConfigsList['download_formats']), ucwords(strtolower($font->getVar('name')))) as $filename => $url) {
+    		$html .= "		<li style=\"float: left; width: 24%; padding: 4px;\" id=\"fontsvnfontdownload\" ><a href=\"".$url."\" target=\"_blank\">".$filename."</a>\n";
+    	}
+    	$html .= "	</ol>\n";
+    	$html .= "</div>\n";
+    	return $html;
+    }
+    
+    function addViewCount($num = 1)
+    {
+    	$this->setVar('views', $this->getVar('views') + $num);
+    	$this->setVar('last', time());
+    	xoops_getModuleHandler('indexes',_MD_FONTSVN_MODULE_DIRNAME)->addViewsByBase($this->getVar('base'), $num);
+    	xoops_getModuleHandler('indexes',_MD_FONTSVN_MODULE_DIRNAME)->addViewsByBase($this->getVar('second'), $num);
+    	xoops_getModuleHandler('indexes',_MD_FONTSVN_MODULE_DIRNAME)->addViewsByBase($this->getVar('thirds'), $num);
+    }
+    
+    
+    function addDownloadCount($num = 1)
+    {
+    	$this->setVar('downloads', $this->getVar('downloads') + $num);
+    	$this->setVar('downloaded', time());
+    	xoops_getModuleHandler('indexes',_MD_FONTSVN_MODULE_DIRNAME)->addDownloadsByBase($this->getVar('base'), $num);
+    	xoops_getModuleHandler('indexes',_MD_FONTSVN_MODULE_DIRNAME)->addDownloadsByBase($this->getVar('second'), $num);
+    	xoops_getModuleHandler('indexes',_MD_FONTSVN_MODULE_DIRNAME)->addDownloadsByBase($this->getVar('thirds'), $num);
+    }
+    
+    /**
+     *
+     * @param string $base
+     * @return boolean|string
+     */
+    function getFontURL($field = 'id')
+    {
+    	global $fontsvnConfigsList;
+    	
+    	if ($fontsvnConfigsList['htaccess']) {
+    		return XOOPS_URL . '/' . $fontsvnConfigsList['base'] . '/font/'.urlencode($this->getVar($field)) . '/' . sef($this->getVar('name')) . '.' . $fontsvnConfigsList['html'];
+    	}
+    	return XOOPS_URL . '/modules/' . _MD_FONTSVN_MODULE_DIRNAME. '/font.php?'.$field.'='.urlencode($this->getVar($field));
+    }
+    
+    /**
+     *
+     * @param string $base
+     * @return boolean|string
+     */
+    function getFontBrowseURL()
+    {
+    	global $fontsvnConfigsList;
+    	
+    	if ($fontsvnConfigsList['htaccess']) {
+    		return XOOPS_URL . '/' . $fontsvnConfigsList['base'] . '/font/' . urlencode($this->getVar('id')) . '/' . sef($this->getVar('name')) . '.' . $fontsvnConfigsList['html'];
+    	}
+    	return XOOPS_URL . '/modules/' . _MD_FONTSVN_MODULE_DIRNAME. '/font.php?id=' . urlencode($this->getVar('id'));
+    }
+    
+    
+    /**
+     *
+     * @param string $base
+     * @return boolean|string
+     */
+    function getPreviewURL($format = 'png')
+    {
+    	global $fontsvnConfigsList;
+    	
+    	if ($fontsvnConfigsList['htaccess']) {
+    		return XOOPS_URL . '/' . $fontsvnConfigsList['base'] . '/preview/' . urlencode($this->getVar('id')) . '.' . $format;
+    	}
+    	return XOOPS_URL . '/modules/' . _MD_FONTSVN_MODULE_DIRNAME. '/preview.php?id=' . urlencode($this->getVar('id')) . '&format=' . $format;
+    }
+
+    
+    /**
+     *
+     * @param string $base
+     * @return boolean|string
+     */
+    function getNamingURL($format = 'png')
+    {
+    	global $fontsvnConfigsList;
+    	
+    	if ($fontsvnConfigsList['htaccess']) {
+    		return XOOPS_URL . '/' . $fontsvnConfigsList['base'] . '/naming/' . urlencode($this->getVar('id')) . '.' . $format;
+    	}
+    	return XOOPS_URL . '/modules/' . _MD_FONTSVN_MODULE_DIRNAME. '/naming.php?id=' . urlencode($this->getVar('id')) . '&format=' . $format;
+    }
+    
+    
+    /**
+     *
+     * @param string $base
+     * @return boolean|string
+     */
+    function getGlyphURL($char = '', $format = 'png')
+    {
+    	global $fontsvnConfigsList;
+    	
+    	if ($fontsvnConfigsList['htaccess']) {
+    		return XOOPS_URL . '/' . $fontsvnConfigsList['base'] . '/glyph/' . urlencode($this->getVar('id')) . '-' . urlencode($char) . '.' . $format;
+    	}
+    	return XOOPS_URL . '/modules/' . _MD_FONTSVN_MODULE_DIRNAME. '/glyph.php?id=' . urlencode($this->getVar('id')) . '&char=' . $char . '&format=' . $format;
+    }
+    
+    
+    /**
+     *
+     * @param string $base
+     * @return boolean|string
+     */
+    function getDownloadURL($pack = 'zip')
+    {
+    	global $fontsvnConfigsList;
+    	
+    	if ($fontsvnConfigsList['htaccess']) {
+    		return XOOPS_URL . '/' . $fontsvnConfigsList['base'] . '/download/' . urlencode($this->getVar('id')) . '.' . $pack;
+    	}
+    	return XOOPS_URL . '/modules/' . _MD_FONTSVN_MODULE_DIRNAME. '/download.php?id=' . urlencode($this->getVar('id')) . '&pack=' . $pack;
+    }
+    
+    /**
+     * 
+     * @return mixed
+     */
+    function getCSSURL()
+    {
+    	global $fontsvnConfigsList;
+    	return str_replace("%apipath%", $fontsvnConfigsList['api_path'], str_replace("%identity%", $this->getVar('identity'), $fontsvnConfigsList['api_path_css']));
+    }
+    
+    /**
+     * 
+     * @param string $format
+     * @return boolean[]|string[]
+     */
+    function getGlyphsURLArray($format = 'png')
+    {
+    	$return = array();
+    	foreach($this->getVar('glyphs') as $key => $value)
+    	{
+    		$return[$value] = $this->getGlyphURL($value, $format);
+    	}
+    	return $return;
+    }
+    
+    /**
+     * 
+     * @param array $packs
+     * @param string $filename
+     * @return boolean[]|string[]
+     */
+    function getDownloadURLsArray($packs = array(), $filename = '')
+    {
+    	$return = array();
+    	foreach($packs as $key => $extension)
+    		$return[$filename . '.' . $extension] = $this->getDownloadURL($extension);
+    	return $return;
+    }
+}
+
+
+/**
+ * Handler Class for Glyphs in Fonts2Web.org.uk Font Converter
+ * @author Simon Roberts (wishcraft@users.sourceforge.net)
+ * @copyright copyright (c) 2015 labs.coop
+ */
+class fontsvnIdentitiesHandler extends fontsvnXoopsObjectHandler
+{
+	
+
+	/**
+	 * Table Name without prefix used
+	 * 
+	 * @var string
+	 */
+	var $tbl = 'fontsvn_identities';
+	
+	/**
+	 * Child Object Handling Class
+	 *
+	 * @var string
+	 */
+	var $child = 'fontsvnIdentities';
+	
+	/**
+	 * Child Object Identity Key
+	 *
+	 * @var string
+	 */
+	var $identity = 'id';
+	
+	/**
+	 * Child Object Default Envaluing Costs
+	 *
+	 * @var string
+	 */
+	var $envalued = 'value';
+	
+    function __construct(&$db) 
+    {
+    	if (!is_object($db))
+    		$db = $GLOBAL["xoopsDB"];
+        parent::__construct($db, $this->tbl, $this->child, $this->identity, $this->envalued);
+    }
+    
+    
+    /**
+     *
+     * @return number
+     */
+    function getTotalMbsInCache()
+    {
+    	xoops_load("XoopsCache");
+    	$caches = XoopsCache::read(_MD_FONTSVN_MODULE_DIRNAME . "-caches-session");
+    	$size = 0;
+    	foreach($caches as $cache => $time)
+    	{
+    		$size = $size + strlen(implode("", $data = XoopsCache::read($cache)));
+    		$size = $size + count($data) * 3;
+    		$size = $size + 2;
+    	}
+    	return number_format($size/1024/1024,2). 'Mb\'s';
+    }
+    
+    /**
+     *
+     * @return number
+     */
+    function getTotalFilesInCache()
+    {
+    	xoops_load("XoopsCache");
+    	$caches = XoopsCache::read(_MD_FONTSVN_MODULE_DIRNAME . "-caches-session");
+    	return count($caches);
+    }
+    
+    /**
+     *
+     * @return number
+     */
+    function getTotalDownloads()
+    {
+    	$sql = "SELECT sum(`downloads`) as `downloads` FROM `" . $GLOBALS['xoopsDB']->prefix($this->tbl) . "` WHERE NOT `polled` = '0'";
+    	list($downloads) = $GLOBALS['xoopsDB']->fetchRow($GLOBALS['xoopsDB']->queryF($sql));
+    	return $downloads;
+    }
+    
+    /**
+     *
+     * @return number
+     */
+    function getTotalViews()
+    {
+    	$sql = "SELECT sum(`views`) as `views` FROM `" . $GLOBALS['xoopsDB']->prefix($this->tbl) . "` WHERE NOT `polled` = '0'";
+    	list($views) = $GLOBALS['xoopsDB']->fetchRow($GLOBALS['xoopsDB']->queryF($sql));
+    	return $views;
+    }
+    
+    /**
+     *
+     * @return number
+     */
+    function getTotalToPoll()
+    {
+    	$criteria = new Criteria("polled","0");
+    	return $this->getCount($criteria);
+    }
+    
+    /**
+     *
+     * @return number
+     */
+    function getTotalPolled()
+    {
+    	$criteria = new Criteria("polled","0", ">");
+    	return $this->getCount($criteria);
+    }
+    
+    /**
+     * 
+     * @return number
+     */
+    function getTotalIdentities()
+    {
+    	$criteria = new Criteria("1","1");
+    	return $this->getCount($criteria);
+    }
+    
+    /**
+     * 
+     * @param unknown $base
+     * @param number $limit
+     * @return boolean|string|boolean
+     */
+    function getRandoms($base = null, $limit = 5)
+    {
+    	if (is_null($base))
+    	{
+    		$sql = "SELECT * FROM `" . $GLOBALS['xoopsDB']->prefix($this->tbl) . "` WHERE NOT `polled` = '0' ORDER BY RAND() LIMIT $limit";
+    	} elseif (strlen($base) == 1)
+    	{
+    		$sql = "SELECT * FROM `" . $GLOBALS['xoopsDB']->prefix($this->tbl) . "` WHERE NOT `polled` = '0' AND `base` LIKE '$base' ORDER BY RAND() LIMIT $limit";
+    	} elseif (strlen($base) == 2)
+    	{
+    		$sql = "SELECT * FROM `" . $GLOBALS['xoopsDB']->prefix($this->tbl) . "` WHERE NOT `polled` = '0' AND `second` LIKE '$base' ORDER BY RAND() LIMIT $limit";
+    	} elseif (strlen($base) == 3)
+    	{
+    		$sql = "SELECT * FROM `" . $GLOBALS['xoopsDB']->prefix($this->tbl) . "` WHERE NOT `polled` = '0' AND `thirds` LIKE '$base' ORDER BY RAND() LIMIT $limit";
+    	}
+    	$result = $GLOBALS['xoopsDB']->queryF($sql);
+    	$return = $objs = array();
+    	while($row = $GLOBALS['xoopsDB']->fetchArray($result))
+    	{
+    		$objs[$row['id']] = new fontsvnIdentities();
+    		$objs[$row['id']]->assignVars($row);
+    	}
+    	if (count($objs)>0)
+    	{
+	    	foreach($objs as $key => $obj)
+	    	{
+	    		$return[$key]['name'] = $obj->getVar('name');
+	    		$return[$key]['views'] = $obj->getVar('views');
+	    		$return[$key]['downloads'] = $obj->getVar('downloads');
+	    		$return[$key]['naming'] = $obj->getNamingURL();
+	    		$return[$key]['url'] = $obj->getFontURL('id');
+	    	}
+	    	return $return;
+    	}
+    	return false;
+    }
+    
+    /**
+     * 
+     * @param unknown $base
+     * @param number $start
+     * @param number $limit
+     * @return boolean|string|boolean
+     */
+    function getFonts($base = null, $start = 0, $limit = 5)
+    {
+    	if (is_null($base))
+    	{
+    		$sql = "SELECT * FROM `" . $GLOBALS['xoopsDB']->prefix($this->tbl) . "` WHERE NOT `polled` = '0' ORDER BY `polled` DESC LIMIT $start, $limit";
+    	} elseif (strlen($base) == 1)
+    	{
+    		$sql = "SELECT * FROM `" . $GLOBALS['xoopsDB']->prefix($this->tbl) . "` WHERE NOT `polled` = '0' AND `base` LIKE '$base' ORDER BY `polled` DESC LIMIT $start, $limit";
+    	} elseif (strlen($base) == 2)
+    	{
+    		$sql = "SELECT * FROM `" . $GLOBALS['xoopsDB']->prefix($this->tbl) . "` WHERE NOT `polled` = '0' AND `second` LIKE '$base' ORDER BY `polled` DESC LIMIT $start, $limit";
+    	} elseif (strlen($base) == 3)
+    	{
+    		$sql = "SELECT * FROM `" . $GLOBALS['xoopsDB']->prefix($this->tbl) . "` WHERE NOT `polled` = '0' AND `thirds` LIKE '$base' ORDER BY `polled` DESC LIMIT $start, $limit";
+    	}
+    	$result = $GLOBALS['xoopsDB']->queryF($sql);
+    	$return = $objs = array();
+    	while($row = $GLOBALS['xoopsDB']->fetchArray($result))
+    	{
+    		$objs[$row['id']] = new fontsvnIdentities();
+    		$objs[$row['id']]->assignVars($row);
+    	}
+    	if (count($objs)>0)
+    	{
+    		foreach($objs as $key => $obj)
+    		{
+    			$return[$key]['name'] = $obj->getVar('name');
+    			$return[$key]['views'] = $obj->getVar('views');
+    			$return[$key]['downloads'] = $obj->getVar('downloads');
+    			$return[$key]['naming'] = $obj->getNamingURL();
+    			$return[$key]['url'] = $obj->getFontURL('id');
+    		}
+    		return $return;
+    	}
+    	return false;
+    }
+    
+    
+    /**
+     *
+     * @param unknown $base
+     * @return integer
+     */
+    function getFontsCount($base = null)
+    {
+    	if (is_null($base))
+    	{
+    		$sql = "SELECT count(*) FROM `" . $GLOBALS['xoopsDB']->prefix($this->tbl) . "` WHERE NOT `polled` = '0' ORDER BY `polled` DESC";
+    	} elseif (strlen($base) == 1)
+    	{
+    		$sql = "SELECT count(*) FROM `" . $GLOBALS['xoopsDB']->prefix($this->tbl) . "` WHERE NOT `polled` = '0' AND `base` LIKE '$base' ORDER BY `polled` DESC";
+    	} elseif (strlen($base) == 2)
+    	{
+    		$sql = "SELECT count(*) FROM `" . $GLOBALS['xoopsDB']->prefix($this->tbl) . "` WHERE NOT `polled` = '0' AND `second` LIKE '$base' ORDER BY `polled` DESC";
+    	} elseif (strlen($base) == 3)
+    	{
+    		$sql = "SELECT count(*) FROM `" . $GLOBALS['xoopsDB']->prefix($this->tbl) . "` WHERE NOT `polled` = '0' AND `thirds` LIKE '$base' ORDER BY `polled` DESC";
+    	}
+    	list($count) = $GLOBALS['xoopsDB']->fetchRow($GLOBALS['xoopsDB']->queryF($sql));
+    	return $count;
+    }
+    
+    /**
+     * 
+     * @param string $base
+     * @return array|NULL[][]|unknown[][]
+     */
+    function getIndexesListbyBase($base = '')
+    {
+    	if (strlen($base) == 0)
+    	{
+    		$sql = "SELECT DISTINCT `base` as `index`, count(*) as `num` FROM `" . $GLOBALS['xoopsDB']->prefix($this->tbl) . "` WHERE LENGTH(`base`) = 1 ORDER BY `base` ASC";
+    	if (strlen($base) == 1)
+    	{
+    		$sql = "SELECT DISTINCT `second` as `index`, count(*) as `num` FROM `" . $GLOBALS['xoopsDB']->prefix($this->tbl) . "` WHERE `base` LIKE '$base' ORDER BY `second` ASC";
+    	} elseif (strlen($base) == 2)
+    	{
+    		$sql = "SELECT DISTINCT `thirds` as `index`, count(*) as `num` FROM `" . $GLOBALS['xoopsDB']->prefix($this->tbl) . "` WHERE `second` LIKE '$base' ORDER BY `thirds` ASC";
+    	} elseif (strlen($base) == 3)
+    	{
+    		return array();
+    	}
+    	
+    	$return = array();
+    	$result = $GLOBALS['xoopsDB']->queryF($sql);
+    	while($row = $GLOBALS['xoopsDB']->fetchArray($result))
+    		$return[$row['index']] = array('url'=>xoops_getModuleHandler('indexes',_MD_FONTSVN_MODULE_DIRNAME)->getIndexBrowseURL($row['index']), 'count' => $row['num'], 'base' => $row['index']);
+    	return $return;
+    }
+}
+}
